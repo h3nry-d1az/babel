@@ -1,10 +1,10 @@
 CC       ?= gcc
 CXX      ?= g++
-CFLAGS   ?= -Wall -Werror -std=c99
-CXXFLAGS ?= -Wall -Werror -std=c++11
+CFLAGS   ?= -Wall -Wextra -Werror -std=c99
+CXXFLAGS ?= -Wall -Wextra -Werror -std=c++11
 
 %: %.c
-	$(CC) $(CFLAGS) $< -o $@
+	$(CC) $(CFLAGS) $(BUILDFLAGS) $< -o $@
 
 %: %.cpp
-	$(CXX) $(CXXFLAGS) $< -o $@
+	$(CXX) $(CXXFLAGS) $(BUILDFLAGS) $< -o $@

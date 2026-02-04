@@ -89,6 +89,47 @@ f_function_t instructions[] = {
     {"drop", 4, &f_drop}, {"2drop", 5, &f_2drop},   {"dup", 3, &f_dup},
     {"nip", 3, &f_nip},   {"\0", 0, &f_nop}};
 
+void next(uint32_t *t, char *pgm, string_t *instr)
+{
+    instr->p = 0;
+    for (; pgm[*t]; (*t)++)
+    {
+        if (pgm[*t] != ' ' && pgm[*t] != '\n' && pgm[*t] != '\t')
+        {
+            instr->data[instr->p++] = pgm[*t];
+            continue;
+        }
+
+        if (instr->p == 1)
+        {
+            if (instr->data[0] == '\\')
+            {
+                for (; pgm[*t] != '\n'; (*t)++)
+                    ;
+                next(t, pgm, instr);
+                return;
+            }
+            else if (instr->data[0] == '(')
+            {
+                for (; pgm[*t] != ')'; (*t)++)
+                    ;
+                (*t)++;
+                next(t, pgm, instr);
+                return;
+            }
+        }
+
+        if (instr->p == 0)
+        {
+            (*t)++;
+            next(t, pgm, instr);
+            return;
+        }
+
+        break;
+    }
+}
+
 void execute(string_t instr, stack_t *dstack)
 {
     for (uint8_t i = 0; instructions[i].length; i++)
@@ -118,51 +159,25 @@ int main(int argc, char **argv)
         return 1;
 
     stack_t dstack = {.p = 0}; //, rstack = {.p = 0};
-    string_t instr = {.p = 0}; //, ptext = {.p = 0};
+    string_t instr = {.p = 0};
 
     char *pgm = argv[1];
+    uint32_t t = 0;
 
-    for (uint32_t t = 0; pgm[t]; t++)
+    while (pgm[t])
     {
-        if (pgm[t] != ' ' && pgm[t] != '\n' && pgm[t] != '\t')
-        {
-            instr.data[instr.p++] = pgm[t];
-            continue;
-        }
-
-        if (instr.p == 0)
-            continue;
+        next(&t, pgm, &instr);
 
 #ifdef DEBUG
+        instr.data[instr.p] = '\0';
         printf("\n");
+        printf("INSTRUCTION: %s\n", instr.data);
         for (int32_t pp = 0; pp < dstack.p; pp++)
             printf("-> %d ", dstack.stack[pp]);
 #endif
 
-        if (instr.p == 1)
-        {
-            if (instr.data[0] == '\\')
-            {
-                for (; pgm[t] != '\n'; t++)
-                    ;
-                instr.p = 0;
-                continue;
-            }
-            else if (instr.data[0] == '(')
-            {
-                for (; pgm[t] != ')'; t++)
-                    ;
-                t++;
-                instr.p = 0;
-                continue;
-            }
-        }
-
         execute(instr, &dstack);
-        instr.p = 0;
     }
-
-    execute(instr, &dstack);
 
     return 0;
 }
@@ -227,7 +242,7 @@ void f_emit(stack_t *s)
     printf("%c", (char)top(s));
 }
 
-void f_cr(stack_t *s)
+void f_cr(stack_t *)
 {
     printf("\n");
 }
