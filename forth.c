@@ -41,11 +41,15 @@ void push(stack_t *s, int32_t v)
 
 int32_t pop(stack_t *s)
 {
+    if (s->p == 0)
+        panic("\n" BRED "RUNTIME ERROR:" RES " Stack empty.");
     return s->stack[--s->p];
 }
 
 int32_t top(const stack_t *s)
 {
+    if (s->p == 0)
+        panic("\n" BRED "RUNTIME ERROR:" RES " Stack empty.");
     return s->stack[s->p - 1];
 }
 
@@ -133,7 +137,8 @@ void next(string_t *instr, stack_t *dstack, uint32_t *t, char *pgm)
     instr->p = 0;
     for (; pgm[*t]; (*t)++)
     {
-        if (pgm[*t] != ' ' && pgm[*t] != '\n' && pgm[*t] != '\t')
+        if (pgm[*t] != ' ' && pgm[*t] != '\n' && pgm[*t] != '\r' &&
+            pgm[*t] != '\t')
         {
             instr->data[instr->p++] = pgm[*t];
             continue;
@@ -245,6 +250,37 @@ _Bool execute(string_t *instr, stack_t *dstack, uint32_t *t, char *pgm)
         return true;
     }
 
+    if (instr->p == 2 && streq(instr, "do", false))
+    {
+        uint32_t tp = *t;
+        uint32_t i = pop(dstack), m = pop(dstack);
+
+        for (;;)
+        {
+            next(instr, dstack, t, pgm);
+
+            if (i >= m)
+                continue;
+
+            if (instr->p == 1 && streq(instr, "i", false))
+            {
+                push(dstack, i);
+            }
+
+            else if (instr->p == 4 && streq(instr, "loop", false))
+            {
+                i++;
+                if (i >= m)
+                    break;
+                *t = tp;
+            }
+
+            else
+                execute(instr, dstack, t, pgm);
+        }
+        return true;
+    }
+
     for (uint8_t i = 0; instructions[i].length; i++)
     {
         if (instructions[i].length != instr->p)
@@ -291,6 +327,11 @@ int main(int argc, char **argv)
             printf("\n" BRED "RUNTIME ERROR:" RES " Instruction \"" UWHT
                    "%s" RES "\" failed to execute.",
                    instr.data);
+#ifdef DEBUG
+            printf("Error information:\n");
+            printf("\t- Instruction identifier: \"%s\"\n", instr.data);
+            printf("\t- Instruction length: %d\n", instr.p);
+#endif
             return 1;
         }
     }
