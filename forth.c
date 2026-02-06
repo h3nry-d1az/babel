@@ -91,10 +91,14 @@ void f_sub(stack_t *);
 void f_mul(stack_t *);
 void f_div(stack_t *);
 void f_mod(stack_t *);
+void f_negate(stack_t *);
+void f_abs(stack_t *);
+
+void f_max(stack_t *);
+void f_min(stack_t *);
 
 void f_and(stack_t *);
 void f_or(stack_t *);
-void f_negate(stack_t *);
 void f_xor(stack_t *);
 
 void f_eq(stack_t *);
@@ -123,13 +127,14 @@ void f_nop(stack_t *)
 }
 
 f_function_t instructions[] = {
-    {"+", 1, &f_add},       {"-", 1, &f_sub},         {"*", 1, &f_mul},
-    {"/", 1, &f_div},       {"mod", 3, &f_mod},       {"and", 3, &f_and},
-    {"or", 2, &f_or},       {"negate", 3, &f_negate}, {"xor", 3, &f_xor},
-    {"=", 1, &f_eq},        {">", 1, &f_gt},          {">=", 2, &f_geq},
-    {"<", 1, &f_lt},        {"<=", 2, &f_leq},        {".", 1, &f_print},
-    {"emit", 4, &f_emit},   {"cr", 2, &f_cr},         {"drop", 4, &f_drop},
-    {"2drop", 5, &f_2drop}, {"dup", 3, &f_dup},       {"nip", 3, &f_nip},
+    {"+", 1, &f_add},       {"-", 1, &f_sub},   {"*", 1, &f_mul},
+    {"/", 1, &f_div},       {"mod", 3, &f_mod}, {"negate", 6, &f_negate},
+    {"abs", 3, &f_abs},     {"max", 3, &f_max}, {"min", 3, &f_min},
+    {"and", 3, &f_and},     {"or", 2, &f_or},   {"xor", 3, &f_xor},
+    {"=", 1, &f_eq},        {">", 1, &f_gt},    {">=", 2, &f_geq},
+    {"<", 1, &f_lt},        {"<=", 2, &f_leq},  {".", 1, &f_print},
+    {"emit", 4, &f_emit},   {"cr", 2, &f_cr},   {"drop", 4, &f_drop},
+    {"2drop", 5, &f_2drop}, {"dup", 3, &f_dup}, {"nip", 3, &f_nip},
     {"swap", 4, &f_swap},   {"\0", 0, &f_nop}};
 
 void next(string_t *instr, stack_t *dstack, uint32_t *t, char *pgm)
@@ -155,8 +160,15 @@ void next(string_t *instr, stack_t *dstack, uint32_t *t, char *pgm)
             }
             else if (instr->data[0] == '(')
             {
-                for (; pgm[*t] != ')'; (*t)++)
-                    ;
+                int32_t L = 1;
+                (*t)++;
+                for (; L; (*t)++)
+                {
+                    if (pgm[*t] == '(')
+                        L++;
+                    else if (pgm[*t] == ')')
+                        L--;
+                }
                 (*t)++;
                 next(instr, dstack, t, pgm);
                 goto cleanup;
@@ -201,8 +213,19 @@ _Bool execute(string_t *instr, stack_t *dstack, uint32_t *t, char *pgm)
         else if (streq(instr, ".(", false))
         {
             string_t s = {.p = 0};
-            while (pgm[++(*t)] != ')')
+            int32_t L = 1;
+            (*t)++;
+            for (;;)
+            {
+                if (pgm[*t] == '(')
+                    L++;
+                else if (pgm[*t] == ')')
+                    L--;
+                if (!L)
+                    break;
                 s.data[s.p++] = pgm[*t];
+                (*t)++;
+            }
             printf("%s", s.data);
             (*t)++;
             return true;
@@ -292,6 +315,14 @@ _Bool execute(string_t *instr, stack_t *dstack, uint32_t *t, char *pgm)
             if (instr->p == 6 && streq(instr, "repeat", false))
             {
                 if (!l)
+                    break;
+                *t = tp;
+                continue;
+            }
+
+            else if (instr->p == 5 && streq(instr, "until", false))
+            {
+                if (!l || pop(dstack))
                     break;
                 *t = tp;
                 continue;
@@ -400,6 +431,29 @@ void f_mod(stack_t *s)
     push(s, b % a);
 }
 
+void f_negate(stack_t *s)
+{
+    push(s, -pop(s));
+}
+
+void f_abs(stack_t *s)
+{
+    int32_t x = pop(s);
+    push(s, (x < 0) ? -x : x);
+}
+
+void f_max(stack_t *s)
+{
+    int32_t a = pop(s), b = pop(s);
+    push(s, (a > b ? a : b));
+}
+
+void f_min(stack_t *s)
+{
+    int32_t a = pop(s), b = pop(s);
+    push(s, (a < b ? a : b));
+}
+
 void f_and(stack_t *s)
 {
     push(s, pop(s) & pop(s));
@@ -408,11 +462,6 @@ void f_and(stack_t *s)
 void f_or(stack_t *s)
 {
     push(s, pop(s) | pop(s));
-}
-
-void f_negate(stack_t *s)
-{
-    push(s, -pop(s));
 }
 
 void f_xor(stack_t *s)
