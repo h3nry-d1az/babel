@@ -78,12 +78,31 @@ _Bool streq(const string_t *s, const char *other, _Bool cs)
     return true;
 }
 
+void strunwrap(char *o, const string_t *s)
+{
+    for (uint8_t i = 0; i < s->p; i++)
+        o[i] = s->data[i];
+}
+
 typedef struct __f_function
 {
     char identifier[256];
     uint8_t length;
     void (*callable)(stack_t *);
 } f_function_t;
+
+typedef struct __word
+{
+    char identifier[256];
+    char code[1024];
+    uint8_t length;
+} word_t;
+
+typedef struct __word_list
+{
+    word_t words[256];
+    uint8_t p;
+} word_list_t;
 
 // Arithmetic/logic functions
 void f_add(stack_t *);
@@ -194,10 +213,41 @@ void next(string_t *instr, stack_t *dstack, uint32_t *t, char *pgm)
     }
 }
 
-_Bool execute(string_t *instr, stack_t *dstack, uint32_t *t, char *pgm)
+_Bool execute(string_t *instr, stack_t *dstack, uint32_t *t, char *pgm,
+              word_list_t *wl)
 {
     if (instr->p == 0)
         return true;
+
+    if (instr->p == 1 && streq(instr, ":", false))
+    {
+        word_t w;
+
+        next(instr, dstack, t, pgm);
+        strunwrap(w.identifier, instr);
+        w.length = instr->p;
+
+        uint16_t i = 0;
+        next(instr, dstack, t, pgm);
+        for (; !streq(instr, ";", false); next(instr, dstack, t, pgm))
+        {
+            strunwrap(w.code + i, instr);
+            i += instr->p;
+            w.code[i++] = ' ';
+        }
+
+        w.code[i] = '\0';
+        wl->words[wl->p++] = w;
+
+#ifdef DEBUG
+        printf("ADDED WORD \"%s\" WITH CODE:\n%s\n", w.identifier, w.code);
+        printf("Current words:\n");
+        for (uint8_t i = 0; i < wl->p; i++)
+            printf("\t- %s : %s\n", wl->words[i].identifier, wl->words[i].code);
+#endif
+
+        return true;
+    }
 
     if (instr->p == 2)
     {
@@ -255,9 +305,7 @@ _Bool execute(string_t *instr, stack_t *dstack, uint32_t *t, char *pgm)
             }
 
             if (state)
-            {
-                execute(instr, dstack, t, pgm);
-            }
+                execute(instr, dstack, t, pgm, wl);
             else
             {
                 if (streq(instr, "if", false))
@@ -298,7 +346,7 @@ _Bool execute(string_t *instr, stack_t *dstack, uint32_t *t, char *pgm)
                 push(dstack, i);
 
             else
-                execute(instr, dstack, t, pgm);
+                execute(instr, dstack, t, pgm, wl);
         }
         return true;
     }
@@ -338,7 +386,7 @@ _Bool execute(string_t *instr, stack_t *dstack, uint32_t *t, char *pgm)
             }
 
             else
-                execute(instr, dstack, t, pgm);
+                execute(instr, dstack, t, pgm, wl);
         }
 
         return true;
@@ -353,6 +401,28 @@ _Bool execute(string_t *instr, stack_t *dstack, uint32_t *t, char *pgm)
             continue;
 
         instructions[i].callable(dstack);
+        return true;
+    }
+
+    for (uint8_t i = 0; i < wl->p; i++)
+    {
+        if (wl->words[i].length != instr->p)
+            continue;
+
+        if (!streq(instr, wl->words[i].identifier, true))
+            continue;
+
+        string_t ii = {.p = 0};
+        uint32_t tt = 0;
+
+        while (wl->words[i].code[tt])
+        {
+            next(&ii, dstack, &tt, wl->words[i].code);
+
+            if (!execute(&ii, dstack, &tt, wl->words[i].code, wl))
+                return false;
+        }
+
         return true;
     }
 
@@ -375,8 +445,9 @@ int main(int argc, char **argv)
     if (argc < 2)
         return 1;
 
-    stack_t dstack = {.p = 0}; //, rstack = {.p = 0};
+    stack_t dstack = {.p = 0};
     string_t instr = {.p = 0};
+    word_list_t wl = {.p = 0};
 
     char *pgm = argv[1];
     uint32_t t = 0;
@@ -385,7 +456,7 @@ int main(int argc, char **argv)
     {
         next(&instr, &dstack, &t, pgm);
 
-        if (!execute(&instr, &dstack, &t, pgm))
+        if (!execute(&instr, &dstack, &t, pgm, &wl))
         {
             printf("\n" BRED "RUNTIME ERROR:" RES " Instruction \"" UWHT
                    "%s" RES "\" failed to execute.",
