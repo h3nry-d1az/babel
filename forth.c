@@ -259,25 +259,57 @@ _Bool execute(string_t *instr, stack_t *dstack, uint32_t *t, char *pgm)
         {
             next(instr, dstack, t, pgm);
 
-            if (i >= m)
-                continue;
-
-            if (instr->p == 1 && streq(instr, "i", false))
-            {
-                push(dstack, i);
-            }
-
-            else if (instr->p == 4 && streq(instr, "loop", false))
+            if (instr->p == 4 && streq(instr, "loop", false))
             {
                 i++;
                 if (i >= m)
                     break;
                 *t = tp;
+                continue;
+            }
+
+            if (i >= m)
+                continue;
+
+            else if (instr->p == 1 && streq(instr, "i", false))
+                push(dstack, i);
+
+            else
+                execute(instr, dstack, t, pgm);
+        }
+        return true;
+    }
+
+    if (instr->p == 5 && streq(instr, "begin", false))
+    {
+        uint32_t tp = *t;
+        _Bool l = true;
+
+        for (;;)
+        {
+            next(instr, dstack, t, pgm);
+
+            if (instr->p == 6 && streq(instr, "repeat", false))
+            {
+                if (!l)
+                    break;
+                *t = tp;
+                continue;
+            }
+
+            if (!l)
+                continue;
+
+            else if (instr->p == 5 && streq(instr, "while", false))
+            {
+                if (!pop(dstack))
+                    l = false;
             }
 
             else
                 execute(instr, dstack, t, pgm);
         }
+
         return true;
     }
 
