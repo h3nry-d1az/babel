@@ -135,10 +135,14 @@ void f_cr(stack_t *);
 void f_drop(stack_t *);
 void f_2drop(stack_t *);
 void f_dup(stack_t *);
-// void f_rot(stack_t *);
+void f_2dup(stack_t *);
+void f_rot(stack_t *);
+void f_over(stack_t *);
 void f_nip(stack_t *);
-// void f_tuck(stack_t *);
+void f_tuck(stack_t *);
 void f_swap(stack_t *);
+void f_pick(stack_t *);
+void f_roll(stack_t *);
 
 // No operation
 void f_nop(stack_t *)
@@ -146,15 +150,17 @@ void f_nop(stack_t *)
 }
 
 f_function_t instructions[] = {
-    {"+", 1, &f_add},       {"-", 1, &f_sub},   {"*", 1, &f_mul},
-    {"/", 1, &f_div},       {"mod", 3, &f_mod}, {"negate", 6, &f_negate},
-    {"abs", 3, &f_abs},     {"max", 3, &f_max}, {"min", 3, &f_min},
-    {"and", 3, &f_and},     {"or", 2, &f_or},   {"xor", 3, &f_xor},
-    {"=", 1, &f_eq},        {">", 1, &f_gt},    {">=", 2, &f_geq},
-    {"<", 1, &f_lt},        {"<=", 2, &f_leq},  {".", 1, &f_print},
-    {"emit", 4, &f_emit},   {"cr", 2, &f_cr},   {"drop", 4, &f_drop},
-    {"2drop", 5, &f_2drop}, {"dup", 3, &f_dup}, {"nip", 3, &f_nip},
-    {"swap", 4, &f_swap},   {"\0", 0, &f_nop}};
+    {"+", 1, &f_add},       {"-", 1, &f_sub},     {"*", 1, &f_mul},
+    {"/", 1, &f_div},       {"mod", 3, &f_mod},   {"negate", 6, &f_negate},
+    {"abs", 3, &f_abs},     {"max", 3, &f_max},   {"min", 3, &f_min},
+    {"and", 3, &f_and},     {"or", 2, &f_or},     {"xor", 3, &f_xor},
+    {"=", 1, &f_eq},        {">", 1, &f_gt},      {">=", 2, &f_geq},
+    {"<", 1, &f_lt},        {"<=", 2, &f_leq},    {".", 1, &f_print},
+    {"emit", 4, &f_emit},   {"cr", 2, &f_cr},     {"drop", 4, &f_drop},
+    {"2drop", 5, &f_2drop}, {"dup", 3, &f_dup},   {"2dup", 4, &f_2dup},
+    {"rot", 3, &f_rot},     {"over", 4, &f_over}, {"nip", 3, &f_nip},
+    {"tuck", 4, &f_tuck},   {"swap", 4, &f_swap}, {"pick", 4, &f_pick},
+    {"roll", 4, &f_roll},   {"\0", 0, &f_nop}};
 
 void next(string_t *instr, stack_t *dstack, uint32_t *t, char *pgm)
 {
@@ -602,9 +608,30 @@ void f_dup(stack_t *s)
     push(s, top(s));
 }
 
-// void f_rot(stack_t *s)
-// {
-// }
+void f_2dup(stack_t *s)
+{
+    if (s->p < 2)
+        panic(BRED "RUNTIME ERROR:" RES " Cannot call \"" UWHT "2dup" UWHT
+                   "\" with less than two elements in the stack.");
+    push(s, s->stack[s->p - 2]);
+    push(s, s->stack[s->p - 2]);
+}
+
+void f_rot(stack_t *s)
+{
+    int32_t n3 = pop(s), n2 = pop(s), n1 = pop(s);
+    push(s, n2);
+    push(s, n3);
+    push(s, n1);
+}
+
+void f_over(stack_t *s)
+{
+    if (s->p < 2)
+        panic(BRED "RUNTIME ERROR:" RES " Cannot call \"" UWHT "over" UWHT
+                   "\" with less than two elements in the stack.");
+    push(s, s->stack[s->p - 2]);
+}
 
 void f_nip(stack_t *s)
 {
@@ -613,13 +640,38 @@ void f_nip(stack_t *s)
     push(s, x);
 }
 
-// void f_tuck(stack_t *s)
-// {
-// }
+void f_tuck(stack_t *s)
+{
+    int32_t n2 = pop(s), n1 = pop(s);
+    push(s, n2);
+    push(s, n1);
+    push(s, n2);
+}
 
 void f_swap(stack_t *s)
 {
     int32_t a = pop(s), b = pop(s);
     push(s, a);
     push(s, b);
+}
+
+void f_pick(stack_t *s)
+{
+    push(s, s->stack[s->p - pop(s) - 2]);
+}
+
+void f_roll(stack_t *s)
+{
+    int32_t x, p = pop(s);
+    int32_t ss[256];
+
+    for (int32_t i = 0; i < p; i++)
+        ss[i] = pop(s);
+
+    x = pop(s);
+
+    for (int32_t i = p - 1; i >= 0; i--)
+        push(s, ss[i]);
+
+    push(s, x);
 }
