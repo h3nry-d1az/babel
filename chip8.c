@@ -3,7 +3,8 @@
  * @version 0.1.0
  * @cite See "Cowgod's Chip-8 Technical Reference v1.0"
  * (http://devernay.free.fr/hacks/chip8/C8TECH10.HTM).
- * @note Build with `make chip8 BUILDFLAGS="[-lmingw32] -lSDL2main -lSDL2"`.
+ * @note Build with `make chip8 BUILDFLAGS="{-DDEBUG} {-DBREAKPOINT} [-lmingw32]
+ * -lSDL2main -lSDL2"`.
  */
 #define RED "\e[0;31m"
 #define BRED "\e[1;31m"
@@ -151,6 +152,20 @@ int main(int argc, char **argv)
                        (uint8_t)((screen[y] & (1ll << (63 - x))) >> (63 - x)));
             printf("\n");
         }
+#ifdef BREAKPOINT
+        for (uint8_t i = 0; i < 16; i += 4)
+        {
+            printf("- V%x : %d", i, reg[i]);
+            printf("\t- V%x : %d", i + 1, reg[i + 1]);
+            printf("\t- V%x : %d", i + 2, reg[i + 2]);
+            printf("\t- V%x : %d\n", i + 3, reg[i + 3]);
+        }
+        printf("PC = %x\tI = %x\n", pc, I);
+        printf("- RAM[I] : %x", ram[I]);
+        printf("\t- RAM[I+1] : %x", ram[I + 1]);
+        printf("\t- RAM[I+2] : %x\n", ram[I + 2]);
+        getchar();
+#endif
 #endif
 
         // 00E0 - CLS
@@ -173,6 +188,7 @@ int main(int argc, char **argv)
         // 1nnn - JP addr
         case 0x1000:
             pc = instr & 0x0FFF;
+            continue;
             break;
 
         // 2nnn - CALL addr
@@ -181,6 +197,7 @@ int main(int argc, char **argv)
                 panic(BRED "RUNTIME ERROR:" RES " Stack limit exceeded (16).");
             stack[sp++] = pc;
             pc = instr & 0x0FFF;
+            continue;
             break;
 
         // 3xkk - SE Vx, byte
