@@ -69,7 +69,7 @@ int main(int argc, char **argv)
     };
     uint8_t sp = 0;
     uint16_t stack[16] = {0};
-    uint8_t dt = 0, st = 0;
+    uint8_t dt = 0; //, st = 0;
     uint64_t screen[32] = {0};
 
     uint16_t rom[ROM_MAX_SIZE] = {0};
@@ -79,12 +79,20 @@ int main(int argc, char **argv)
         panic(RED "RUNTIME ERROR:" RES " Could not read file \"%s\".", argv[1]);
     fclose(fptr);
 
-    printf("%x\n", rom[0]);
-
     srand(time(NULL));
 
     for (pc = 0; pc < ROM_MAX_SIZE; pc++)
     {
+#ifdef DEBUG
+        printf("\n%x\n", rom[pc]);
+        for (uint8_t y = 0; y < 32; y++)
+        {
+            for (uint8_t x = 0; x < 64; x++)
+                printf("%d",
+                       (uint8_t)((screen[y] & (1ll << (63 - x))) >> (63 - x)));
+            printf("\n");
+        }
+#endif
         instr = rom[pc];
 
         // 00E0 - CLS
@@ -223,19 +231,27 @@ int main(int argc, char **argv)
 
         // Dxyn - DRW Vx, Vy, nibble
         case 0xD000:
-            // uint8_t px = Vx & 0x3F, py = Vy & 0x1F;
-            // uint8_t b, bw, bo;
-            // for (uint8_t i = 0; i < instr & 0x000F; i++)
-            // {
-            //     b = ram[I + i];
-            //     if (px > 63 - 8)
-            //     {
-            //         bo = b;
-            //     }
-            //     if (bo )
-            //     px = (px + 8) & 0x3F;
-            // }
-            // TODO: Paint this onto the screen.
+            uint8_t px = Vx & 0x3F, py = Vy & 0x1F;
+            uint8_t k = px + 8 - 64;
+            uint64_t b, b1, b2;
+            for (uint8_t i = 0; i < (instr & 0x000F); i++)
+            {
+                b = ram[I + i];
+                b1 = b << (64 - 8) >> px;
+                if (px > 64 - 8)
+                    b2 = (b & ((1 << k) - 1)) << (64 - k);
+                else
+                    b2 = 0;
+                b = b1 ^ b2;
+
+                if (screen[py] & b)
+                    VF = 1;
+
+                screen[py] ^= (b1 ^ b2);
+                py = (py + 1) & 0x1F;
+            }
+            // TODO:
+            //     Paint this onto the screen.
             break;
         }
 
@@ -268,7 +284,7 @@ int main(int argc, char **argv)
 
         // Fx18 - LD ST, Vx
         case 0xF018:
-            st = Vx;
+            // st = Vx;
             break;
 
         // Fx1E - ADD I, Vx
@@ -291,17 +307,13 @@ int main(int argc, char **argv)
         // Fx55 - LD [I], Vx
         case 0xF055:
             for (uint8_t i = 0; i <= ((instr & 0x0F00) >> 8); i++)
-            {
                 ram[I + i] = reg[i];
-            }
             break;
 
         // Fx65 - LD Vx, [I]
         case 0xF065:
             for (uint8_t i = 0; i <= ((instr & 0x0F00) >> 8); i++)
-            {
                 reg[i] = ram[I + i];
-            }
             break;
         }
     }
