@@ -3,8 +3,8 @@
  * @version 0.1.0
  * @cite See "Cowgod's Chip-8 Technical Reference v1.0"
  * (http://devernay.free.fr/hacks/chip8/C8TECH10.HTM).
- * @note Build with `make chip8 BUILDFLAGS="{-DDEBUG} {-DBREAKPOINT} [-lmingw32]
- * -lSDL2main -lSDL2"`.
+ * @note Build with `make chip8 BUILDFLAGS="{-DDEBUG} {-DBREAKPOINTS}
+ * [-lmingw32] -lSDL2main -lSDL2"`.
  */
 #define RED "\e[0;31m"
 #define BRED "\e[1;31m"
@@ -45,6 +45,12 @@
 #define TARGET_FPS 60
 #define FRAME_DELAY (1000 / TARGET_FPS)
 
+SDL_Scancode keyboard[16] = {
+    SDL_SCANCODE_X, SDL_SCANCODE_1, SDL_SCANCODE_2, SDL_SCANCODE_3,
+    SDL_SCANCODE_Q, SDL_SCANCODE_W, SDL_SCANCODE_E, SDL_SCANCODE_A,
+    SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_Z, SDL_SCANCODE_C,
+    SDL_SCANCODE_4, SDL_SCANCODE_R, SDL_SCANCODE_F, SDL_SCANCODE_V};
+
 uint16_t pop(uint16_t *s, uint8_t *sp)
 {
     if (*sp == 0)
@@ -81,7 +87,7 @@ int main(int argc, char **argv)
     };
     uint8_t sp = 0;
     uint16_t stack[16] = {0};
-    uint8_t dt = 0; //, st = 0;
+    uint8_t dt = 0, st = 0;
     uint64_t screen[32] = {0};
 
     FILE *fptr = fopen(argv[1], "rb");
@@ -102,8 +108,8 @@ int main(int argc, char **argv)
     SDL_Event e;
     SDL_Rect rect;
     uint32_t fs, ft;
+    const uint8_t *keyboard_state;
 
-    // for (pc = 0x0200; pc < 0x1000; pc += 2)
     for (;;)
     {
         fs = SDL_GetTicks();
@@ -138,6 +144,12 @@ int main(int argc, char **argv)
         if (dt)
             dt--;
 
+        if (st)
+        {
+            // play audio
+            st--;
+        }
+
         if (pc > 0x1000)
             continue;
 
@@ -152,15 +164,15 @@ int main(int argc, char **argv)
                        (uint8_t)((screen[y] & (1ll << (63 - x))) >> (63 - x)));
             printf("\n");
         }
-#ifdef BREAKPOINT
+#ifdef BREAKPOINTS
         for (uint8_t i = 0; i < 16; i += 4)
         {
-            printf("- V%x : %d", i, reg[i]);
-            printf("\t- V%x : %d", i + 1, reg[i + 1]);
-            printf("\t- V%x : %d", i + 2, reg[i + 2]);
-            printf("\t- V%x : %d\n", i + 3, reg[i + 3]);
+            printf("- V%x : %x", i, reg[i]);
+            printf("\t- V%x : %x", i + 1, reg[i + 1]);
+            printf("\t- V%x : %x", i + 2, reg[i + 2]);
+            printf("\t- V%x : %x\n", i + 3, reg[i + 3]);
         }
-        printf("PC = %x\tI = %x\n", pc, I);
+        printf("PC = %x\tI = %x\tDT = %x\tST = %x\n", pc, I, dt, st);
         printf("- RAM[I] : %x", ram[I]);
         printf("\t- RAM[I+1] : %x", ram[I + 1]);
         printf("\t- RAM[I+2] : %x\n", ram[I + 2]);
@@ -177,7 +189,10 @@ int main(int argc, char **argv)
 
         // 00EE - RET
         else if (instr == 0x00EE)
-            pc = pop(stack, &sp);
+        {
+            pc = pop(stack, &sp) + 2;
+            continue;
+        }
 
         switch (instr & 0xF000)
         {
@@ -189,33 +204,31 @@ int main(int argc, char **argv)
         case 0x1000:
             pc = instr & 0x0FFF;
             continue;
-            break;
 
         // 2nnn - CALL addr
-        case 0x200:
+        case 0x2000:
             if (sp == 16)
                 panic(BRED "RUNTIME ERROR:" RES " Stack limit exceeded (16).");
             stack[sp++] = pc;
             pc = instr & 0x0FFF;
             continue;
-            break;
 
         // 3xkk - SE Vx, byte
         case 0x3000:
             if (Vx == (instr & 0x00FF))
-                pc++;
+                pc += 2;
             break;
 
         // 4xkk - SNE Vx, byte
         case 0x4000:
             if (Vx != (instr & 0x00FF))
-                pc++;
+                pc += 2;
             break;
 
         // 5xy0 - SE Vx, Vy
         case 0x5000:
             if (Vx == Vy)
-                pc++;
+                pc += 2;
             break;
 
         // 6xkk - LD Vx, byte
@@ -286,7 +299,7 @@ int main(int argc, char **argv)
         // 9xy0 - SNE Vx, Vy
         case 0x9000:
             if (Vx != Vy)
-                pc++;
+                pc += 2;
             break;
 
         // Annn - LD I, addr
@@ -297,7 +310,7 @@ int main(int argc, char **argv)
         // Bnnn - JP V0, addr
         case 0xB000:
             pc = 0x0FFF + reg[0];
-            break;
+            continue;
 
         // Cxkk - RND Vx, byte
         case 0xC000:
@@ -331,12 +344,21 @@ int main(int argc, char **argv)
         {
         // Ex9E - SKP Vx
         case 0xE09E:
-            // TODO: implement this
+            if (Vx >= 16)
+                continue;
+            keyboard_state = SDL_GetKeyboardState(NULL);
+            pc += (keyboard_state[keyboard[Vx]] ? 2 : 0);
             break;
 
         // ExA1 - SKNP Vx
         case 0xE0A1:
-            // TODO: implement this
+            if (Vx >= 16)
+            {
+                pc += 4;
+                continue;
+            }
+            keyboard_state = SDL_GetKeyboardState(NULL);
+            pc += (keyboard_state[keyboard[Vx]] ? 0 : 2);
             break;
 
         // Fx07 - LD Vx, DT
@@ -346,7 +368,20 @@ int main(int argc, char **argv)
 
         // Fx0A - LD Vx, K
         case 0xF00A:
-            // TODO: implement this
+            while (1)
+            {
+                SDL_PumpEvents();
+                keyboard_state = SDL_GetKeyboardState(NULL);
+                for (uint8_t i = 0; i < 16; i++)
+                {
+                    if (keyboard_state[keyboard[i]])
+                    {
+                        Vx = i;
+                        goto finish_fetching;
+                    }
+                }
+            }
+        finish_fetching:
             break;
 
         // Fx15 - LD DT, Vx
@@ -356,7 +391,7 @@ int main(int argc, char **argv)
 
         // Fx18 - LD ST, Vx
         case 0xF018:
-            // st = Vx;
+            st = Vx;
             break;
 
         // Fx1E - ADD I, Vx
