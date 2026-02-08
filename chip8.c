@@ -3,6 +3,7 @@
  * @version 0.1.0
  * @cite See "Cowgod's Chip-8 Technical Reference v1.0"
  * (http://devernay.free.fr/hacks/chip8/C8TECH10.HTM).
+ * @note Build with `make chip8 BUILDFLAGS="[-lmingw32] -lSDL2main -lSDL2"`.
  */
 #define RED "\e[0;31m"
 #define BRED "\e[1;31m"
