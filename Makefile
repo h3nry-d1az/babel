@@ -4,7 +4,7 @@ CFLAGS   ?= -Wall -Wextra -Werror -std=c99
 CXXFLAGS ?= -Wall -Wextra -Werror -std=c++11
 
 %: %.c
-	$(CC) $(CFLAGS) $(BUILDFLAGS) $< -o $@
+	$(CC) $(CFLAGS) $< -o $@ $(BUILDFLAGS)
 
 %: %.cpp
-	$(CXX) $(CXXFLAGS) $(BUILDFLAGS) $< -o $@
+	$(CXX) $(CXXFLAGS) $< -o $@ $(BUILDFLAGS)

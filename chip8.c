@@ -17,7 +17,7 @@
     do                                                                         \
     {                                                                          \
         printf(__VA_ARGS__);                                                   \
-        return 1;                                                              \
+        exit(1);                                                               \
     } while (0);
 
 #ifndef ROM_MAX_SIZE
@@ -28,10 +28,20 @@
 #define Vy (reg[(instr & 0x00F0) >> 4])
 #define VF (reg[0xF])
 
+#include <SDL2/SDL.h>
+#include <errno.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+
+#define SCREEN_WIDTH 640
+#define SCREEN_HEIGHT 320
+#define CELL_SIZE 10
+
+#define TARGET_FPS 60
+#define FRAME_DELAY (1000 / TARGET_FPS)
 
 uint16_t pop(uint16_t *s, uint8_t *sp)
 {
@@ -45,7 +55,7 @@ int main(int argc, char **argv)
     if (argc < 2)
         return 1;
 
-    uint16_t pc = 0;
+    uint16_t pc = 0x0200;
     uint16_t instr;
     uint8_t reg[16] = {0};
     uint16_t I = 0;
@@ -79,8 +89,56 @@ int main(int argc, char **argv)
 
     srand(time(NULL));
 
-    for (pc = 0x0200; pc < 0x1000; pc += 2)
+    SDL_Init(SDL_INIT_VIDEO);
+    SDL_Window *window = SDL_CreateWindow(
+        "CHIP-8 Emulator", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+        SCREEN_WIDTH, SCREEN_HEIGHT, 0);
+
+    SDL_Renderer *renderer =
+        SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+
+    SDL_Event e;
+    SDL_Rect rect;
+    uint32_t fs, ft;
+
+    // for (pc = 0x0200; pc < 0x1000; pc += 2)
+    for (;;)
     {
+        fs = SDL_GetTicks();
+
+        while (SDL_PollEvent(&e))
+        {
+            if (e.type == SDL_QUIT)
+                goto cleanup;
+        }
+
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        SDL_RenderClear(renderer);
+        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+
+        for (uint8_t y = 0; y < 32; y++)
+        {
+            for (uint8_t x = 0; x < 64; x++)
+            {
+                if (screen[y] & (1ll << (63 - x)))
+                {
+                    rect = (SDL_Rect){.x = x * CELL_SIZE,
+                                      .y = y * CELL_SIZE,
+                                      .w = CELL_SIZE,
+                                      .h = CELL_SIZE};
+                    SDL_RenderFillRect(renderer, &rect);
+                }
+            }
+        }
+
+        SDL_RenderPresent(renderer);
+
+        if (dt)
+            dt--;
+
+        if (pc > 0x1000)
+            continue;
+
         instr = (ram[pc] << 8) + ram[pc + 1];
 
 #ifdef DEBUG
@@ -241,7 +299,6 @@ int main(int argc, char **argv)
                     b2 = (b & ((1 << k) - 1)) << (64 - k);
                 else
                     b2 = 0;
-                b = b1 ^ b2;
 
                 if (screen[py] & b)
                     VF = 1;
@@ -249,8 +306,6 @@ int main(int argc, char **argv)
                 screen[py] ^= (b1 ^ b2);
                 py = (py + 1) & 0x1F;
             }
-            // TODO:
-            //     Paint this onto the screen.
             break;
         }
 
@@ -315,7 +370,18 @@ int main(int argc, char **argv)
                 reg[i] = ram[I + i];
             break;
         }
+
+        ft = SDL_GetTicks() - fs;
+        if (ft < FRAME_DELAY)
+            SDL_Delay(FRAME_DELAY - ft);
+
+        pc += 2;
     }
+
+cleanup:
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
+    SDL_Quit();
 
     return 0;
 }
