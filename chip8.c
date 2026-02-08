@@ -72,19 +72,19 @@ int main(int argc, char **argv)
     uint8_t dt = 0; //, st = 0;
     uint64_t screen[32] = {0};
 
-    uint16_t rom[ROM_MAX_SIZE] = {0};
-
     FILE *fptr = fopen(argv[1], "rb");
-    if (!fread(rom, 2, ROM_MAX_SIZE, fptr))
+    if (!fread(ram + 0x200, 1, 0x1000 - 0x200, fptr))
         panic(RED "RUNTIME ERROR:" RES " Could not read file \"%s\".", argv[1]);
     fclose(fptr);
 
     srand(time(NULL));
 
-    for (pc = 0; pc < ROM_MAX_SIZE; pc++)
+    for (pc = 0x0200; pc < 0x1000; pc += 2)
     {
+        instr = (ram[pc] << 8) + ram[pc + 1];
+
 #ifdef DEBUG
-        printf("\n%x\n", rom[pc]);
+        printf("\n%x\n", instr);
         for (uint8_t y = 0; y < 32; y++)
         {
             for (uint8_t x = 0; x < 64; x++)
@@ -93,7 +93,6 @@ int main(int argc, char **argv)
             printf("\n");
         }
 #endif
-        instr = rom[pc];
 
         // 00E0 - CLS
         if (instr == 0x00E0)
