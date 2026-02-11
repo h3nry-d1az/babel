@@ -4,8 +4,8 @@
 
 ; Two bytes explicitly exported
 Sprite:
-    x8040 ; Line 1 (10000000) and Line 2 (01000000)
-    x2010 ; Line 3 (00100000) and Line 4 (00010000)
+    b1000000001000000
+    b0010000000010000
 
 Main:
     LD V0 x00
