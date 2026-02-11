@@ -39,3 +39,6 @@
 
 # debug information files
 *.dwo
+
+# Chip-8 ROMs
+*.ch8

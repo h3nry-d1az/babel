@@ -307,7 +307,7 @@ uint16_t compile(uint16_t lineno, instruction_t instr,
                 case '[':
                     if (!streqlc(instr + 2, "[i]"))
                         goto undefined_ld;
-                    return 0xF055 + Vx;
+                    return 0xF065 + Vx;
                 default:
                     return 0x6000 + Vx + parse_byte(lineno, instr + 2);
                 }
