@@ -437,7 +437,7 @@ void compile_source(char* src, char* main_filename, chip8_rom_t *rom,
 	#ifdef DEBUG
 	printf("Labels:\n");
     for(size_t i = 0; i < labels->p; i++){
-        printf("%s - %p\n", labels->labels[i].name, labels->labels[i].addr);
+        printf("%s - %p\n", labels->labels[i].name, (void*)(size_t)labels->labels[i].addr);
     }
 	printf("\n");
 	#endif
@@ -561,7 +561,8 @@ char* preprocess_source(char* src, char* filename){
     
     for (lineno = 1; tok; lineno++, tok = advance(tok)){
         
-        for (indentation = 0; tok[indentation] == ' ' || tok[indentation] == '\t'; indentation++);
+        for (indentation = 0; tok[indentation] == ' ' || tok[indentation] == '\t'; indentation++)
+			;
         
 		tok += indentation;
         
@@ -675,7 +676,7 @@ int main(int argc, char **argv)
     pgm = preprocess_source(pgm, argv[1]);
 
 	#ifdef DEBUG
-	printf("Post-process source:\n%s\n\n", pgm);
+	printf("Post-process source:\n\n%s\n\n", pgm);
 	#endif
 	
     compile_source(pgm, argv[1], &rom, &labels, &pc);
