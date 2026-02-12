@@ -417,7 +417,7 @@ void compile_source(char* src, char* main_filename, chip8_rom_t *rom,
             while(*(word_end_ptr++));
         }
 		word_end_ptr--;
-        while(*word_end_ptr == '\t' || *word_end_ptr == ' ' || *word_end_ptr == '\n') word_end_ptr--;
+        while(*word_end_ptr == '\t' || *word_end_ptr == ' ' || *word_end_ptr == '\n' || *word_end_ptr == '\r') word_end_ptr--;
         if(*word_end_ptr == ':'){
             struct __asm_label lb = {.addr = label_pc};
             uint8_t idx;
