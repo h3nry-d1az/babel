@@ -408,7 +408,7 @@ void compile_source(char* src, char* main_filename, chip8_rom_t *rom,
 		
         if (tok[0] == ';' || tok[0] == '\n')
             continue;
-        if(tok[0] == '_' && tok[1] == '_')
+        if(strncmp(tok, "%__file ", 8) == 0)
 			continue;
         
         char* word_end_ptr = advance(tok);
@@ -455,17 +455,17 @@ void compile_source(char* src, char* main_filename, chip8_rom_t *rom,
             continue;
 			
 		// Handle filename changes
-		if(tok[0] == '_' && tok[1] == '_'){
-			if(tok[2] == '-'){
+		if(strncmp(tok, "%__file ", 8) == 0){
+			if(tok[8] == '-'){
 				filename = *(--filename_stack);
 				lineno = *(--lineno_stack);
 				lineno -= 1;
 				continue;
 			}
 			size_t s = 0;
-			while(tok[2 + s] != '\n') s++;
+			while(tok[8 + s] != '\n') s++;
 			filename = malloc(sizeof(char) * s);
-			memcpy(filename, tok + 2, s);
+			memcpy(filename, tok + 8, s);
 			*(++filename_stack) = filename;
 			
 			*(lineno_stack++) = lineno;
@@ -601,7 +601,7 @@ char* preprocess_source(char* src, char* filename){
 			
 			// __filename\n at the start of the file
 			// __-\n at the end of the file
-			size_t overhead_size = 2 + import_filename_size + 1 + 5;
+			size_t overhead_size = 8 + import_filename_size + 1 + 11;
 			
             char* new_src_ptr = malloc(len + imported_size + overhead_size - skip_size);
             
@@ -612,8 +612,8 @@ char* preprocess_source(char* src, char* filename){
             memcpy(cpy_ptr, src, n_read - 1);
 			cpy_ptr += n_read - 1;
 			
-			memcpy(cpy_ptr, "__", 2);
-			cpy_ptr += 2;
+			memcpy(cpy_ptr, "%__file ", 8);
+			cpy_ptr += 8;
 			memcpy(cpy_ptr, import_filename, import_filename_size);
 			cpy_ptr += import_filename_size;
 			*(cpy_ptr++) = '\n';
@@ -621,8 +621,8 @@ char* preprocess_source(char* src, char* filename){
             memcpy(cpy_ptr, file_contents, imported_size);
 			cpy_ptr += imported_size;
 			
-			memcpy(cpy_ptr, "\n__-\n", 5);
-			cpy_ptr += 5;
+			memcpy(cpy_ptr, "\n%__file -\n", 11);
+			cpy_ptr += 11;
 			
             memcpy(cpy_ptr, src + n_read + skip_size, len - n_read);
             
