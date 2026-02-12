@@ -666,6 +666,12 @@ int main(int argc, char **argv)
 
     
     char* pgm = read_file(argv[1], NULL);
+	
+	if(pgm == NULL){
+		printf(BRED "FATAL ERROR:" RES " Input file not found.");
+		return 1;
+	}
+	
     pgm = preprocess_source(pgm, argv[1]);
 
 	#ifdef DEBUG
