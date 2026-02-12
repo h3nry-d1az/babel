@@ -375,72 +375,107 @@ uint16_t compile(uint16_t lineno, const char *filename, instruction_t instr,
           instr[0].name);
 }
 
-void compile_file(const char *filename, chip8_rom_t *rom,
+void compile_source(char* src, char* main_filename, chip8_rom_t *rom,
                   asm_label_list_t *labels, uint16_t *pc)
 {
-    char *tok = (char *)malloc(1 << 14);
-    instruction_t instr;
-    uint16_t lineno = 0;
 
-    FILE *fp = fopen(filename, "r");
-    size_t _nr = fread(tok, 1, 1 << 14, fp);
-    if (!_nr)
-        panic(lineno, filename,
-              "File " UWHT "%s" RES " is either empty or non-existent.",
-              filename);
-    tok[_nr] = '\0';
-    fclose(fp);
+	char* filename;
+	
+    uint16_t lineno;
+    instruction_t instr;
+    char* tok = src;
 
     uint8_t indentation;
+    
+    uint16_t label_pc = *pc;
+	
+	char* filename_stack_arr[256];
+	char** filename_stack = filename_stack_arr;
+
+	size_t lineno_stack_arr[256];
+	size_t* lineno_stack = lineno_stack_arr;
+
+	*(filename_stack) = main_filename;
+	filename = *filename_stack;
+	
+    for (lineno = 1; tok; lineno++, tok = advance(tok))
+    {
+        for (indentation = 0;
+         tok[indentation] == ' ' || tok[indentation] == '\t'; indentation++)
+        ;
+		
+		tok += indentation;
+		
+        if (tok[0] == ';' || tok[0] == '\n')
+            continue;
+        if(tok[0] == '_' && tok[1] == '_')
+			continue;
+        
+        char* word_end_ptr = advance(tok);
+        if(word_end_ptr == NULL){
+            word_end_ptr = tok;
+            while(*(word_end_ptr++));
+        }
+		word_end_ptr--;
+        while(*word_end_ptr == '\t' || *word_end_ptr == ' ' || *word_end_ptr == '\n') word_end_ptr--;
+        if(*word_end_ptr == ':'){
+            struct __asm_label lb = {.addr = label_pc};
+            uint8_t idx;
+            for (idx = 0; tok[idx] != ' ' && tok[idx] != ':' && tok[idx] != '\n' &&
+                          tok[idx] != '\r';
+                 idx++)
+                lb.name[idx] = tok[idx];
+            lb.name[idx + 1] = '\0';
+            *(tok) = ';'; // Cheeky comment the label (for example, Stop: -> ;top: )
+            append_label(labels, lb);
+            continue;
+        }
+        // Instruction line
+        label_pc += 2;
+    }
+    
+	#ifdef DEBUG
+	printf("Labels:\n");
+    for(size_t i = 0; i < labels->p; i++){
+        printf("%s - %p\n", labels->labels[i].name, labels->labels[i].addr);
+    }
+	printf("\n");
+	#endif
+
+    tok = src;
     for (lineno = 1; tok; lineno++, tok = advance(tok))
     {
         for (indentation = 0;
              tok[indentation] == ' ' || tok[indentation] == '\t'; indentation++)
             ;
-
-        if (indentation != 0 || tok[0] == ';')
-            goto parse_next_instruction;
-
-        if (tok[0] == '#')
-        {
-            for (uint8_t i = 1; i <= 8; i++)
-            {
-                if (lower(tok[i]) != "#include "[i])
-                    panic(lineno, filename,
-                          "Import statements must begin with" UWHT
-                          "\"#include\"" RES ".");
-
-                if (tok[9] != '\"')
-                    panic(lineno, filename,
-                          "Files to include must be enclosed within quotes.");
-            }
-
-            char imported[256];
-            for (uint8_t i = 10; tok[i] != '\"'; i++)
-                imported[i - 10] = tok[i];
-
-            compile_file(imported, rom, labels, pc);
-
-#ifdef DEBUG
-            printf("File %s compiled successfully.\n", imported);
-            printf("Current ROM size: %d B.\n", rom->p);
-#endif
-
+			
+		tok += indentation;
+        
+        if (tok[0] == ';' || tok[0] == '\n')
             continue;
-        }
-
-        struct __asm_label lb = {.addr = *pc};
-        uint8_t idx;
-        for (idx = 0; tok[idx] != ' ' && tok[idx] != ':' && tok[idx] != '\n' &&
-                      tok[idx] != '\r';
-             idx++)
-            lb.name[idx] = tok[idx];
-        lb.name[idx + 1] = '\0';
-        append_label(labels, lb);
-        continue;
-
-    parse_next_instruction:
-        instr[0].p = 0, instr[1].p = 0, instr[2].p = 0;
+			
+		// Handle filename changes
+		if(tok[0] == '_' && tok[1] == '_'){
+			if(tok[2] == '-'){
+				filename = *(--filename_stack);
+				lineno = *(--lineno_stack);
+				lineno -= 1;
+				continue;
+			}
+			size_t s = 0;
+			while(tok[2 + s] != '\n') s++;
+			filename = malloc(sizeof(char) * s);
+			memcpy(filename, tok + 2, s);
+			*(++filename_stack) = filename;
+			
+			*(lineno_stack++) = lineno;
+			
+			lineno = 0;
+			
+			continue;
+		}
+        
+        instr[0].p = 0, instr[1].p = 0, instr[2].p = 0, instr[3].p = 0;
         uint8_t wordno = 0;
         for (uint8_t i = 0; tok[i] && tok[i] != '\n' && wordno < MAX_PARAMS;
              i++)
@@ -477,7 +512,134 @@ void compile_file(const char *filename, chip8_rom_t *rom,
         append_instr(rom, compile(lineno, filename, instr, labels));
         *pc += 2;
     }
+	
+	
+	while(filename_stack != (char**)filename_stack_arr){
+		free(*filename_stack);
+		filename_stack--;
+	}
+	
 }
+
+
+
+
+char* read_file(char filename[], size_t* filesize_ptr){
+    FILE *f_ptr = fopen(filename, "r");
+    
+    if(f_ptr == NULL){
+        return NULL;
+    }
+    
+    fseek(f_ptr, 0L, SEEK_END);
+    size_t filesize = ftell(f_ptr);
+    fseek(f_ptr, 0L, SEEK_SET);
+    
+    char* src = (char*)malloc(filesize + 1);
+    
+    fread(src, 1, filesize, f_ptr);
+
+    src[filesize] = '\0';
+    
+    if(filesize_ptr) *filesize_ptr = filesize;
+    
+    fclose(f_ptr);
+    
+    return src;
+}
+
+
+
+char* preprocess_source(char* src, char* filename){
+    size_t len = 0;
+    while(src[len]) len++;
+    
+    uint8_t indentation;
+    uint16_t lineno;
+    char* tok = src;
+
+    
+    for (lineno = 1; tok; lineno++, tok = advance(tok)){
+        
+        for (indentation = 0; tok[indentation] == ' ' || tok[indentation] == '\t'; indentation++);
+        
+        
+        if (tok[0] == '#'){
+            for (uint8_t i = 1; i <= 8; i++)
+            {
+                if (lower(tok[i]) != "#include "[i])
+                    panic(lineno, "",
+                          "Import statements must begin with" UWHT
+                          "\"#include\"" RES ".");
+
+                if (tok[9] != '\"')
+                    panic(lineno, "",
+                          "Files to include must be enclosed within quotes.");
+            }
+
+            char import_filename[256];
+            uint8_t i;
+            for (i = 10; tok[i] != '\"'; i++)
+                import_filename[i - 10] = tok[i];
+            
+			size_t import_filename_size = i - 10;
+			
+            import_filename[i - 10] = '\0';
+            
+            size_t imported_size = 0;
+            size_t skip_size = i;
+            char* file_contents = read_file(import_filename, &imported_size);
+            
+			if(file_contents == NULL){
+        		panic(lineno, filename,
+              		"File " UWHT "%s" RES " is either empty or non-existent.",
+              		import_filename);				
+			}
+			
+			file_contents = preprocess_source(file_contents, import_filename);
+			
+			// __filename\n at the start of the file
+			// __-\n at the end of the file
+			size_t overhead_size = 2 + import_filename_size + 1 + 5;
+			
+            char* new_src_ptr = malloc(len + imported_size + overhead_size - skip_size);
+            
+            size_t n_read = tok - src + 1;
+            
+			char* cpy_ptr = new_src_ptr;
+			
+            memcpy(cpy_ptr, src, n_read - 1);
+			cpy_ptr += n_read - 1;
+			
+			memcpy(cpy_ptr, "__", 2);
+			cpy_ptr += 2;
+			memcpy(cpy_ptr, import_filename, import_filename_size);
+			cpy_ptr += import_filename_size;
+			*(cpy_ptr++) = '\n';
+			
+            memcpy(cpy_ptr, file_contents, imported_size);
+			cpy_ptr += imported_size;
+			
+			memcpy(cpy_ptr, "\n__-\n", 5);
+			cpy_ptr += 5;
+			
+            memcpy(cpy_ptr, src + n_read + skip_size, len - n_read);
+            
+            free(file_contents);
+            free(src);
+            
+            len += imported_size;
+            tok = new_src_ptr + n_read;
+            src = new_src_ptr;
+            
+            continue;
+        }        
+    }
+	
+    return src;
+}
+
+
 
 int main(int argc, char **argv)
 {
@@ -501,7 +663,17 @@ int main(int argc, char **argv)
         append_instr(&rom, 0);
     }
 
-    compile_file(argv[1], &rom, &labels, &pc);
+    
+    char* pgm = read_file(argv[1], NULL);
+    pgm = preprocess_source(pgm, argv[1]);
+
+	#ifdef DEBUG
+	printf("Post-process source:\n%s\n\n", pgm);
+	#endif
+	
+    compile_source(pgm, argv[1], &rom, &labels, &pc);
+
+	free(pgm);
 
     if (jp_start)
     {
