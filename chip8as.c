@@ -563,6 +563,7 @@ char* preprocess_source(char* src, char* filename){
         
         for (indentation = 0; tok[indentation] == ' ' || tok[indentation] == '\t'; indentation++);
         
+		tok += indentation;
         
         if (tok[0] == '#'){
             for (uint8_t i = 1; i <= 8; i++)
