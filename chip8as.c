@@ -553,7 +553,8 @@ char* read_file(char filename[], size_t* filesize_ptr){
 char* preprocess_source(char* src, char* filename){
     size_t len = 0;
     while(src[len]) len++;
-    
+    len++;
+	
     uint8_t indentation;
     uint16_t lineno;
     char* tok = src;
@@ -603,8 +604,9 @@ char* preprocess_source(char* src, char* filename){
 			// __filename\n at the start of the file
 			// __-\n at the end of the file
 			size_t overhead_size = 8 + import_filename_size + 1 + 11;
+			size_t new_src_mem_size = len - 1 + imported_size + overhead_size - skip_size;
 			
-            char* new_src_ptr = malloc(len + imported_size + overhead_size - skip_size);
+            char* new_src_ptr = malloc(new_src_mem_size);
             
             size_t n_read = tok - src + 1;
             
@@ -626,7 +628,8 @@ char* preprocess_source(char* src, char* filename){
 			cpy_ptr += 11;
 			
             memcpy(cpy_ptr, src + n_read + skip_size, len - n_read - skip_size);
-            
+            cpy_ptr += len - n_read - skip_size;
+			
             free(file_contents);
             free(src);
             
