@@ -445,7 +445,6 @@ void compile_source(char* src, char* main_filename, chip8_rom_t *rom,
     tok = src;
     for (lineno = 1; tok; lineno++, tok = advance(tok))
     {
-        printf("Line %d\n", lineno);
         for (indentation = 0;
              tok[indentation] == ' ' || tok[indentation] == '\t' || tok[indentation] == '\r'; indentation++)
             ;
