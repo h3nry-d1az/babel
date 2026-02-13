@@ -445,6 +445,7 @@ void compile_source(char* src, char* main_filename, chip8_rom_t *rom,
     tok = src;
     for (lineno = 1; tok; lineno++, tok = advance(tok))
     {
+        printf("Line %d\n", lineno);
         for (indentation = 0;
              tok[indentation] == ' ' || tok[indentation] == '\t' || tok[indentation] == '\r'; indentation++)
             ;
@@ -586,7 +587,7 @@ char* preprocess_source(char* src, char* filename){
             
 			size_t import_filename_size = i - 10;
 			
-            import_filename[i - 10] = '\0';
+            import_filename[import_filename_size] = '\0';
             
             size_t imported_size = 0;
             size_t skip_size = i;
@@ -625,7 +626,7 @@ char* preprocess_source(char* src, char* filename){
 			memcpy(cpy_ptr, "\n%__file -\n", 11);
 			cpy_ptr += 11;
 			
-            memcpy(cpy_ptr, src + n_read + skip_size, len - n_read);
+            memcpy(cpy_ptr, src + n_read + skip_size, len - n_read - skip_size);
             
             free(file_contents);
             free(src);
