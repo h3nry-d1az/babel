@@ -550,8 +550,6 @@ char *read_file(char filename[], size_t *filesize_ptr)
 
     src[filesize] = '\0';
 
-    printf("%s", src);
-
     if (filesize_ptr)
         *filesize_ptr = filesize;
 
