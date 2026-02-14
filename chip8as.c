@@ -1,6 +1,6 @@
 /**
- * @author Henry Díaz Bordón
- * @version 0.1.0
+ * @author Henry Díaz Bordón, Kyryl Shyshko
+ * @version 1.0.0
  */
 #define BRED "\e[1;31m"
 #define UWHT "\e[4;37m"
@@ -375,107 +375,120 @@ uint16_t compile(uint16_t lineno, const char *filename, instruction_t instr,
           instr[0].name);
 }
 
-void compile_source(char* src, char* main_filename, chip8_rom_t *rom,
-                  asm_label_list_t *labels, uint16_t *pc)
+void compile_source(char *src, char *main_filename, chip8_rom_t *rom,
+                    asm_label_list_t *labels, uint16_t *pc)
 {
+    char *filename;
 
-	char* filename;
-	
     uint16_t lineno;
     instruction_t instr;
-    char* tok = src;
+    char *tok = src;
 
     uint8_t indentation;
-    
+
     uint16_t label_pc = *pc;
-	
-	char* filename_stack_arr[256];
-	char** filename_stack = filename_stack_arr;
 
-	size_t lineno_stack_arr[256];
-	size_t* lineno_stack = lineno_stack_arr;
+    char *filename_stack_arr[256];
+    char **filename_stack = filename_stack_arr;
 
-	*(filename_stack) = main_filename;
-	filename = *filename_stack;
-	
+    size_t lineno_stack_arr[256];
+    size_t *lineno_stack = lineno_stack_arr;
+
+    *(filename_stack) = main_filename;
+    filename = *filename_stack;
+
     for (lineno = 1; tok; lineno++, tok = advance(tok))
     {
         for (indentation = 0;
-         tok[indentation] == ' ' || tok[indentation] == '\t' || tok[indentation] == '\r'; indentation++)
-        ;
-		
-		tok += indentation;
-		
+             tok[indentation] == ' ' || tok[indentation] == '\t' ||
+             tok[indentation] == '\r';
+             indentation++)
+            ;
+
+        tok += indentation;
+
         if (tok[0] == ';' || tok[0] == '\n')
             continue;
-        if(strncmp(tok, "%__file ", 8) == 0)
-			continue;
-        
-        char* word_end_ptr = advance(tok);
-        if(word_end_ptr == NULL){
+        if (strncmp(tok, "%__file ", 8) == 0)
+            continue;
+
+        char *word_end_ptr = advance(tok);
+        if (word_end_ptr == NULL)
+        {
             word_end_ptr = tok;
-            while(*(word_end_ptr++));
+            while (*(word_end_ptr++))
+                ;
         }
-		word_end_ptr--;
-        while(*word_end_ptr == '\t' || *word_end_ptr == ' ' || *word_end_ptr == '\n' || *word_end_ptr == '\r') word_end_ptr--;
-        if(*word_end_ptr == ':'){
+        word_end_ptr--;
+        while (*word_end_ptr == '\t' || *word_end_ptr == ' ' ||
+               *word_end_ptr == '\n' || *word_end_ptr == '\r')
+            word_end_ptr--;
+        if (*word_end_ptr == ':')
+        {
             struct __asm_label lb = {.addr = label_pc};
             uint8_t idx;
-            for (idx = 0; tok[idx] != ' ' && tok[idx] != ':' && tok[idx] != '\n' &&
-                          tok[idx] != '\r';
+            for (idx = 0; tok[idx] != ' ' && tok[idx] != ':' &&
+                          tok[idx] != '\n' && tok[idx] != '\r';
                  idx++)
                 lb.name[idx] = tok[idx];
             lb.name[idx + 1] = '\0';
-            *(tok) = ';'; // Cheeky comment the label (for example, Stop: -> ;top: )
+            *(tok) =
+                ';'; // Cheeky comment the label (for example, Stop: -> ;top: )
             append_label(labels, lb);
             continue;
         }
-        // Instruction line
+
         label_pc += 2;
     }
-    
-	#ifdef DEBUG
-	printf("Labels:\n");
-    for(size_t i = 0; i < labels->p; i++){
-        printf("%s - %p\n", labels->labels[i].name, (void*)(size_t)labels->labels[i].addr);
-    }
-	printf("\n");
-	#endif
+
+#ifdef DEBUG
+    printf("Labels:\n");
+    for (size_t i = 0; i < labels->p; i++)
+        printf("%s : %x\n", labels->labels[i].name, labels->labels[i].addr);
+    printf("\n");
+#endif
 
     tok = src;
     for (lineno = 1; tok; lineno++, tok = advance(tok))
     {
         for (indentation = 0;
-             tok[indentation] == ' ' || tok[indentation] == '\t' || tok[indentation] == '\r'; indentation++)
+             tok[indentation] == ' ' || tok[indentation] == '\t' ||
+             tok[indentation] == '\r';
+             indentation++)
             ;
-			
-		tok += indentation;
-        
+
+        tok += indentation;
+
         if (tok[0] == ';' || tok[0] == '\n')
             continue;
-			
-		// Handle filename changes
-		if(strncmp(tok, "%__file ", 8) == 0){
-			if(tok[8] == '-'){
-				filename = *(--filename_stack);
-				lineno = *(--lineno_stack);
-				lineno -= 1;
-				continue;
-			}
-			size_t s = 0;
-			while(tok[8 + s] != '\n') s++;
-			filename = malloc(sizeof(char) * s);
-			memcpy(filename, tok + 8, s);
-			*(++filename_stack) = filename;
-			
-			*(lineno_stack++) = lineno;
-			
-			lineno = 0;
-			
-			continue;
-		}
-        
+
+        // Handle filename changes
+        if (strncmp(tok, "%__file ", 8) == 0)
+        {
+            if (tok[8] == '-')
+            {
+                filename = *(--filename_stack);
+                lineno = *(--lineno_stack);
+                lineno -= 1;
+                continue;
+            }
+            size_t s = 0;
+            while (tok[8 + s] != '\n')
+                s++;
+            filename = malloc(sizeof(char) * s);
+            memcpy(filename, tok + 8, s);
+            *(++filename_stack) = filename;
+
+            *(lineno_stack++) = lineno;
+
+            lineno = 0;
+
+            continue;
+        }
+
         instr[0].p = 0, instr[1].p = 0, instr[2].p = 0, instr[3].p = 0;
+        instr[0].name[0] = '\0', instr[1].name[0] = '\0',
+        instr[2].name[0] = '\0', instr[3].name[0] = '\0';
         uint8_t wordno = 0;
         for (uint8_t i = 0; tok[i] && tok[i] != '\n' && wordno < MAX_PARAMS;
              i++)
@@ -505,69 +518,72 @@ void compile_source(char* src, char* main_filename, chip8_rom_t *rom,
             continue;
 
 #ifdef DEBUG
-        printf("Line %d: [%s | %s | %s | %s]\n", lineno, instr[0].name,
+        printf("Line %02d: [%s | %s | %s | %s]\n", lineno, instr[0].name,
                instr[1].name, instr[2].name, instr[3].name);
 #endif
 
         append_instr(rom, compile(lineno, filename, instr, labels));
         *pc += 2;
     }
-	
-	
-	while(filename_stack != (char**)filename_stack_arr){
-		free(*filename_stack);
-		filename_stack--;
-	}
-	
+
+    while (filename_stack != (char **)filename_stack_arr)
+    {
+        free(*filename_stack);
+        filename_stack--;
+    }
 }
 
+char *read_file(char filename[], size_t *filesize_ptr)
+{
+    FILE *f_ptr = fopen(filename, "rb");
 
-
-
-char* read_file(char filename[], size_t* filesize_ptr){
-    FILE *f_ptr = fopen(filename, "r");
-    
-    if(f_ptr == NULL){
+    if (f_ptr == NULL)
         return NULL;
-    }
-    
+
     fseek(f_ptr, 0L, SEEK_END);
     size_t filesize = ftell(f_ptr);
     fseek(f_ptr, 0L, SEEK_SET);
-    
-    char* src = (char*)malloc(filesize + 1);
-    
+
+    char *src = (char *)malloc(filesize + 1);
+
     fread(src, 1, filesize, f_ptr);
 
     src[filesize] = '\0';
-    
-    if(filesize_ptr) *filesize_ptr = filesize;
-    
+
+    printf("%s", src);
+
+    if (filesize_ptr)
+        *filesize_ptr = filesize;
+
     fclose(f_ptr);
-    
+
     return src;
 }
 
-
-
-char* preprocess_source(char* src, char* filename){
+char *preprocess_source(char *src, char *filename)
+{
     size_t len = 0;
-    while(src[len]) len++;
+    while (src[len])
+        len++;
     len++;
-	
+
     uint8_t indentation;
     uint16_t lineno;
-    char* tok = src;
+    char *tok = src;
 
-    
-    for (lineno = 1; tok; lineno++, tok = advance(tok)){
-        
-        for (indentation = 0; tok[indentation] == ' ' || tok[indentation] == '\t' || tok[indentation] == '\r'; indentation++)
-			;
-        
-		tok += indentation;
-        
-        if (tok[0] == '#'){
+    for (lineno = 1; tok; lineno++, tok = advance(tok))
+    {
+
+        for (indentation = 0;
+             tok[indentation] == ' ' || tok[indentation] == '\t' ||
+             tok[indentation] == '\r';
+             indentation++)
+            ;
+
+        tok += indentation;
+
+        if (tok[0] == '#')
+        {
             for (uint8_t i = 1; i <= 8; i++)
             {
                 if (lower(tok[i]) != "#include "[i])
@@ -584,67 +600,67 @@ char* preprocess_source(char* src, char* filename){
             uint8_t i;
             for (i = 10; tok[i] != '\"'; i++)
                 import_filename[i - 10] = tok[i];
-            
-			size_t import_filename_size = i - 10;
-			
+
+            size_t import_filename_size = i - 10;
+
             import_filename[import_filename_size] = '\0';
-            
+
             size_t imported_size = 0;
             size_t skip_size = i;
-            char* file_contents = read_file(import_filename, &imported_size);
-            
-			if(file_contents == NULL){
-        		panic(lineno, filename,
-              		"File " UWHT "%s" RES " is either empty or non-existent.",
-              		import_filename);				
-			}
-			
-			file_contents = preprocess_source(file_contents, import_filename);
-			
-			// __filename\n at the start of the file
-			// __-\n at the end of the file
-			size_t overhead_size = 8 + import_filename_size + 1 + 11;
-			size_t new_src_mem_size = len - 1 + imported_size + overhead_size - skip_size;
-			
-            char* new_src_ptr = malloc(new_src_mem_size);
-            
+            char *file_contents = read_file(import_filename, &imported_size);
+
+            if (file_contents == NULL)
+            {
+                panic(lineno, filename,
+                      "File " UWHT "%s" RES " is either empty or non-existent.",
+                      import_filename);
+            }
+
+            file_contents = preprocess_source(file_contents, import_filename);
+
+            // __filename\n at the start of the file
+            // __-\n at the end of the file
+            size_t overhead_size = 8 + import_filename_size + 1 + 11;
+            size_t new_src_mem_size =
+                len - 1 + imported_size + overhead_size - skip_size;
+
+            char *new_src_ptr = malloc(new_src_mem_size);
+
             size_t n_read = tok - src + 1;
-            
-			char* cpy_ptr = new_src_ptr;
-			
+
+            char *cpy_ptr = new_src_ptr;
+
             memcpy(cpy_ptr, src, n_read - 1);
-			cpy_ptr += n_read - 1;
-			
-			memcpy(cpy_ptr, "%__file ", 8);
-			cpy_ptr += 8;
-			memcpy(cpy_ptr, import_filename, import_filename_size);
-			cpy_ptr += import_filename_size;
-			*(cpy_ptr++) = '\n';
-			
+            cpy_ptr += n_read - 1;
+
+            memcpy(cpy_ptr, "%__file ", 8);
+            cpy_ptr += 8;
+            memcpy(cpy_ptr, import_filename, import_filename_size);
+            cpy_ptr += import_filename_size;
+            *(cpy_ptr++) = '\n';
+
             memcpy(cpy_ptr, file_contents, imported_size);
-			cpy_ptr += imported_size;
-			
-			memcpy(cpy_ptr, "\n%__file -\n", 11);
-			cpy_ptr += 11;
-			
+            cpy_ptr += imported_size;
+
+            memcpy(cpy_ptr, "\n%__file -\n", 11);
+            cpy_ptr += 11;
+
             memcpy(cpy_ptr, src + n_read + skip_size, len - n_read - skip_size);
             cpy_ptr += len - n_read - skip_size;
-			
+
             free(file_contents);
             free(src);
-            
+
             len += imported_size;
             tok = new_src_ptr + n_read;
             src = new_src_ptr;
-            
+
             continue;
-        }        
+        }
     }
-	
+
     return src;
 }
-
-
 
 int main(int argc, char **argv)
 {
@@ -668,23 +684,27 @@ int main(int argc, char **argv)
         append_instr(&rom, 0);
     }
 
-    
-    char* pgm = read_file(argv[1], NULL);
-	
-	if(pgm == NULL){
-		printf(BRED "FATAL ERROR:" RES " Input file not found.");
-		return 1;
-	}
-	
+    char *pgm = read_file(argv[1], NULL);
+
+    if (pgm == NULL)
+    {
+        printf(BRED "FATAL ERROR:" RES " Input file not found.");
+        return 1;
+    }
+
     pgm = preprocess_source(pgm, argv[1]);
 
-	#ifdef DEBUG
-	printf("Post-process source:\n\n%s\n\n", pgm);
-	#endif
-	
+#ifdef DEBUG
+    printf("Post-processed source:\n"
+           "----------------------\n"
+           "%s\n"
+           "----------------------\n",
+           pgm);
+#endif
+
     compile_source(pgm, argv[1], &rom, &labels, &pc);
 
-	free(pgm);
+    free(pgm);
 
     if (jp_start)
     {
