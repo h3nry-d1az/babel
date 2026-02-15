@@ -42,3 +42,6 @@
 
 # Chip-8 ROMs
 *.ch8
+
+# Chip-8 disassembler output
+output.s
