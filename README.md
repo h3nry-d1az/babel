@@ -22,7 +22,7 @@ produced by `make`.
 
 ## Contributing
 If the proposed changes do not compile with the project [`Makefile`](./Makefile),
-they will immediately rejected, same if the majority of the tests do not pass.
+they will immediately be rejected; same if a substantial number of the tests do not pass.
 Make sure to format the code according to the project [`.clang-format`](./.clang-format).
 
 ## License

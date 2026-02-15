@@ -247,6 +247,12 @@ int main(int argc, char **argv)
               argv[1]);
     fclose(fptr);
 
+    _Bool no_labels = (argc == 3 && !strcmp(argv[2], "--no-labels")) ||
+                      (argc >= 4 && !strcmp(argv[3], "--no-labels"));
+
+    if (no_labels)
+        goto skip_labels;
+
     for (uint16_t i = 0; i < fsize; i += 2)
     {
         instr = (rom[i] << 8) + rom[i + 1];
@@ -262,6 +268,7 @@ int main(int argc, char **argv)
         }
     }
 
+skip_labels:
     for (uint16_t pc = 0x200; pc < fsize + 0x200; pc += 2)
     {
         if (get_label(labels, pc))
@@ -281,7 +288,13 @@ int main(int argc, char **argv)
         append_line(&disas, line);
     }
 
-    fptr = fopen((argc >= 3 ? argv[2] : "output.s"), "wb");
+    if (argc < 3 || (argc == 3 && no_labels))
+        fptr = fopen("output.s", "wb");
+    else if (argc >= 4 && !strcmp(argv[2], "--no-labels"))
+        fptr = fopen(argv[3], "wb");
+    else
+        fptr = fopen(argv[2], "wb");
+
     fwrite(disas.data, 1, disas.p, fptr);
     fclose(fptr);
 
