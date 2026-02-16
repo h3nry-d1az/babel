@@ -23,6 +23,8 @@
     (addr >= 0x200 && addr < fsize + 0x200 && get_label(labels, addr) &&       \
      !(addr & 1))
 
+#define FOLLOWS_FORMAT(bm, v) ((instr & bm) == v)
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -54,174 +56,134 @@ void set_label(uint64_t *labels, uint16_t label)
 
 void decompile(char *line, uint16_t instr, uint64_t *labels, size_t fsize)
 {
-    if (instr == 0x00E0)
-    {
+    if (FOLLOWS_FORMAT(0xFFFF, 0x00E0))
         strcpy(line, "cls");
-        return;
-    }
 
-    else if (instr == 0x00EE)
-    {
+    else if (FOLLOWS_FORMAT(0xFFFF, 0x00EE))
         strcpy(line, "ret");
-        return;
-    }
 
-    switch (instr & 0xF000)
-    {
-    case 0x0000:
+    else if (FOLLOWS_FORMAT(0xF000, 0x0000))
         sprintf(line, "sys x%03x", addr);
-        return;
 
-    case 0x1000:
+    else if (FOLLOWS_FORMAT(0xF000, 0x1000))
+    {
         if (VALID_ADDRESS)
             sprintf(line, "jp @_i%03x", (addr - 0x200) >> 1);
         else
             sprintf(line, "jp x%03x", addr);
-        return;
+    }
 
-    case 0x2000:
+    else if (FOLLOWS_FORMAT(0xF000, 0x2000))
+    {
         if (VALID_ADDRESS)
             sprintf(line, "call @_i%03x", (addr - 0x200) >> 1);
         else
             sprintf(line, "call x%03x", addr);
-        return;
+    }
 
-    case 0x3000:
+    else if (FOLLOWS_FORMAT(0xF000, 0x3000))
         sprintf(line, "se v%x x%x", Vx, byte);
-        return;
 
-    case 0x4000:
+    else if (FOLLOWS_FORMAT(0xF000, 0x4000))
         sprintf(line, "sne v%x x%x", Vx, byte);
-        return;
 
-    case 0x5000:
+    else if (FOLLOWS_FORMAT(0xF00F, 0x5000))
         sprintf(line, "se v%x v%x", Vx, Vy);
-        return;
 
-    case 0x6000:
+    else if (FOLLOWS_FORMAT(0xF000, 0x6000))
         sprintf(line, "ld v%x x%x", Vx, byte);
-        return;
 
-    case 0x7000:
+    else if (FOLLOWS_FORMAT(0xF000, 0x7000))
         sprintf(line, "add v%x x%x", Vx, byte);
-        return;
 
-    case 0x8000:
-        switch (instr & 0x000F)
-        {
-        case 0:
-            sprintf(line, "ld v%x v%x", Vx, Vy);
-            return;
+    else if (FOLLOWS_FORMAT(0xF00F, 0x8000))
+        sprintf(line, "ld v%x v%x", Vx, Vy);
 
-        case 1:
-            sprintf(line, "or v%x v%x", Vx, Vy);
-            return;
+    else if (FOLLOWS_FORMAT(0xF00F, 0x8001))
+        sprintf(line, "or v%x v%x", Vx, Vy);
 
-        case 2:
-            sprintf(line, "and v%x v%x", Vx, Vy);
-            return;
+    else if (FOLLOWS_FORMAT(0xF00F, 0x8002))
+        sprintf(line, "and v%x v%x", Vx, Vy);
 
-        case 3:
-            sprintf(line, "xor v%x v%x", Vx, Vy);
-            return;
+    else if (FOLLOWS_FORMAT(0xF00F, 0x8003))
+        sprintf(line, "xor v%x v%x", Vx, Vy);
 
-        case 4:
-            sprintf(line, "add v%x v%x", Vx, Vy);
-            return;
+    else if (FOLLOWS_FORMAT(0xF00F, 0x8004))
+        sprintf(line, "add v%x v%x", Vx, Vy);
 
-        case 5:
-            sprintf(line, "sub v%x v%x", Vx, Vy);
-            return;
+    else if (FOLLOWS_FORMAT(0xF00F, 0x8005))
+        sprintf(line, "sub v%x v%x", Vx, Vy);
 
-        case 6:
-            sprintf(line, "shr v%x v%x", Vx, Vy);
-            return;
+    else if (FOLLOWS_FORMAT(0xF00F, 0x8006))
+        sprintf(line, "shr v%x v%x", Vx, Vy);
 
-        case 7:
-            sprintf(line, "subn v%x v%x", Vx, Vy);
-            return;
+    else if (FOLLOWS_FORMAT(0xF00F, 0x8007))
+        sprintf(line, "subn v%x v%x", Vx, Vy);
 
-        case 0xE:
-            sprintf(line, "shl v%x v%x", Vx, Vy);
-            return;
-        }
-        break;
+    else if (FOLLOWS_FORMAT(0xF00F, 0x800E))
+        sprintf(line, "shl v%x v%x", Vx, Vy);
 
-    case 0x9000:
+    else if (FOLLOWS_FORMAT(0xF00F, 0x9000))
         sprintf(line, "sne v%x v%x", Vx, Vy);
-        return;
 
-    case 0xA000:
+    else if (FOLLOWS_FORMAT(0xF000, 0xA000))
+    {
         if (VALID_ADDRESS)
             sprintf(line, "ld I @_i%03x", (addr - 0x200) >> 1);
         else
             sprintf(line, "ld I x%03x", addr);
-        return;
+    }
 
-    case 0xB000:
+    else if (FOLLOWS_FORMAT(0xF000, 0xB000))
+    {
         if (VALID_ADDRESS)
             sprintf(line, "jp v0 @_i%03x", (addr - 0x200) >> 1);
         else
             sprintf(line, "jp v0 x%03x", addr);
-        return;
+    }
 
-    case 0xC000:
+    else if (FOLLOWS_FORMAT(0xF000, 0xC000))
         sprintf(line, "rnd v%x x%x", Vx, byte);
-        return;
 
-    case 0xD000:
+    else if (FOLLOWS_FORMAT(0xF000, 0xD000))
         sprintf(line, "drw v%x v%x x%x", Vx, Vy, nibble);
-        return;
-    }
 
-    switch (instr & 0xF0FF)
-    {
-    case 0xE09E:
+    else if (FOLLOWS_FORMAT(0xF0FF, 0xE09E))
         sprintf(line, "skp v%x", Vx);
-        return;
 
-    case 0xE0A1:
+    else if (FOLLOWS_FORMAT(0xF0FF, 0xE0A1))
         sprintf(line, "sknp v%x", Vx);
-        return;
 
-    case 0xF007:
+    else if (FOLLOWS_FORMAT(0xF0FF, 0xF007))
         sprintf(line, "ld v%x DT", Vx);
-        return;
 
-    case 0xF00A:
+    else if (FOLLOWS_FORMAT(0xF0FF, 0xF00A))
         sprintf(line, "ld v%x K", Vx);
-        return;
 
-    case 0xF015:
+    else if (FOLLOWS_FORMAT(0xF0FF, 0xF015))
         sprintf(line, "ld DT v%x", Vx);
-        return;
 
-    case 0xF018:
+    else if (FOLLOWS_FORMAT(0xF0FF, 0xF018))
         sprintf(line, "ld ST v%x", Vx);
-        return;
 
-    case 0xF01E:
+    else if (FOLLOWS_FORMAT(0xF0FF, 0xF01E))
         sprintf(line, "add I v%x", Vx);
-        return;
 
-    case 0xF029:
+    else if (FOLLOWS_FORMAT(0xF0FF, 0xF029))
         sprintf(line, "ld F v%x", Vx);
-        return;
 
-    case 0xF033:
+    else if (FOLLOWS_FORMAT(0xF0FF, 0xF033))
         sprintf(line, "ld B v%x", Vx);
-        return;
 
-    case 0xF055:
+    else if (FOLLOWS_FORMAT(0xF0FF, 0xF055))
         sprintf(line, "ld [I] v%x", Vx);
-        return;
 
-    case 0xF065:
+    else if (FOLLOWS_FORMAT(0xF0FF, 0xF065))
         sprintf(line, "ld v%x [I]", Vx);
-        return;
-    }
 
-    sprintf(line, "x%04x", instr);
+    else
+        sprintf(line, "x%04x", instr);
+
     return;
 }
 
